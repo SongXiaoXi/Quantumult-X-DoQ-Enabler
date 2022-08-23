@@ -1,0 +1,1 @@
+{ Filter = { Bundles = ( "com.crossutility.quantumult-x", "com.crossutility.quantumult-x.quantumult-x-intents", "com.crossutility.quantumult-x.quantumult-x-tunnel" ); }; }
