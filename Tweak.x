@@ -106,11 +106,22 @@ static void nw_quic_add_tls_application_protocol(void *conn, const char *applica
 	sec_protocol_options_add_tls_application_protocol(sec_protocol_options, application_protocol);
 }
 
+static void (*orig_nw_protocol_udp_finalize_output_frames)(void *arg0, void *arg1);
+static void nw_protocol_udp_finalize_output_frames(void *arg0, void *arg1) {
+	//set_checksum_ptr();
+	void *ptr = *(void **)(arg0 + 0x28);
+	uint64_t orig = *(uint64_t *)(ptr + 0x88);
+	*(uint64_t *)(ptr + 0x88) = 0;
+	orig_nw_protocol_udp_finalize_output_frames(arg0, arg1);
+	*(uint64_t *)(ptr + 0x88) = orig;
+}
+
 %ctor {
 	
 	if (@available(iOS 15, macOS 12, *)) {
 		return;
 	}
+	
 	void *main_start = dlsym(RTLD_MAIN_ONLY, MH_EXECUTE_SYM);
 	if (main_start) {
 		rebind_symbols_image(main_start, 
@@ -123,6 +134,14 @@ static void nw_quic_add_tls_application_protocol(void *conn, const char *applica
 	
 	if (@available(iOS 13, *)) {
 		if (@available(iOS 14, *)) {
+			if (@available(iOS 14.3, *)) {
+			} else {
+				MSImageRef libnetwork = MSGetImageByName("/usr/lib/libnetwork.dylib");
+				if (libnetwork != NULL) {
+					void *func = MSFindSymbol(libnetwork, "___nw_protocol_udp_finalize_output_frames_block_invoke");
+					MSHookFunction(func, nw_protocol_udp_finalize_output_frames, (void**)&orig_nw_protocol_udp_finalize_output_frames);
+				}
+			}
 		} else {
 			%init(iOS13);
 		}
