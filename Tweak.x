@@ -1,6 +1,5 @@
 #include <stdio.h>
 #import <mach-o/ldsyms.h>
-#import <Network/Network.h>
 #include <dlfcn.h>
 #include "fishhook.h"
 
@@ -8,6 +7,12 @@ struct os_system_version_s {
     unsigned int major;
     unsigned int minor;
     unsigned int patch;
+};
+
+struct _CAFrameRateRange {
+  float minimum;
+  float maximum;
+  float preferred;
 };
 
 static const char SystemVersion_plist[] = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -47,6 +52,20 @@ extern int os_system_version_get_current_version(struct os_system_version_s * _N
 
 %group iOS14
 
+%hook CADisplayLink
+
+%new
+- (void)setPreferredFrameRateRange:(struct _CAFrameRateRange)range {
+	self.preferredFramesPerSecond = 60;
+}
+
+%new 
+- (struct _CAFrameRateRange)preferedFrameRateRange {
+	return (struct _CAFrameRateRange){60, 60, 60};
+}
+
+%end
+
 %hook UITableView
 
 %new
@@ -56,6 +75,18 @@ extern int os_system_version_get_current_version(struct os_system_version_s * _N
 %new
 -(void)setPrefetchingEnabled:(bool)enabled {
 	return;
+}
+
+%end
+
+%hook _UIDeferredMenuElement
+
+%new
++ (instancetype)elementWithUncachedProvider:(void(^)(void (^completion)(NSArray *elements)))elementProvider {
+	if (@available(iOS 14, *)) {
+		return [self elementWithProvider:elementProvider];
+	}
+	return nil;
 }
 
 %end
@@ -116,6 +147,10 @@ static void nw_protocol_udp_finalize_output_frames(void *arg0, void *arg1) {
 	*(uint64_t *)(ptr + 0x88) = orig;
 }
 
+static struct _CAFrameRateRange _CAFrameRateRangeMake(float minimum, float maximum, float preferred) {
+	return (struct _CAFrameRateRange){minimum, maximum, preferred};
+}
+
 %ctor {
 	
 	if (@available(iOS 15, macOS 12, *)) {
@@ -126,10 +161,11 @@ static void nw_protocol_udp_finalize_output_frames(void *arg0, void *arg1) {
 	if (main_start) {
 		rebind_symbols_image(main_start, 
 			(uint64_t)main_start - 0x100000000, 
-			(struct rebinding[2]){
+			(struct rebinding[3]){
 				{"nw_parameters_create_quic", (void *) nw_parameters_create_quic_connection, NULL}, 
-				{"nw_quic_add_tls_application_protocol", nw_quic_add_tls_application_protocol, NULL}
-			}, 2);
+				{"nw_quic_add_tls_application_protocol", nw_quic_add_tls_application_protocol, NULL},
+				{"CAFrameRateRangeMake", _CAFrameRateRangeMake, NULL}
+			}, 3);
 	}
 	
 	if (@available(iOS 13, *)) {
@@ -149,7 +185,7 @@ static void nw_protocol_udp_finalize_output_frames(void *arg0, void *arg1) {
 		} else {
 			%init(iOS14_5);
 		}
-		%init(iOS14);
+		%init(iOS14, _UIDeferredMenuElement = objc_getClass("UIDeferredMenuElement"));
 	}
 	%init(Availability);
 }

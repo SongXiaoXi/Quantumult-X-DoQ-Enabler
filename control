@@ -1,6 +1,6 @@
 Package: com.sxx.quantumultx-patches
 Name: Quantumult X DoQ (iOS 14)
-Version: 1.1
+Version: 1.2
 Architecture: iphoneos-arm
 Description: Enable Quantumult X quic (DoQ) for iOS 14.
 Maintainer: SXX
