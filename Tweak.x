@@ -1,5 +1,7 @@
 #include <stdio.h>
 #import <mach-o/ldsyms.h>
+#include <Foundation/Foundation.h>
+#include <UIKit/UIKit.h>
 #include <dlfcn.h>
 #include "fishhook.h"
 
@@ -50,54 +52,39 @@ extern int os_system_version_get_current_version(struct os_system_version_s * _N
 
 %end
 
-%group iOS14
-
-%hook CADisplayLink
-
-%new
-- (void)setPreferredFrameRateRange:(struct _CAFrameRateRange)range {
-	self.preferredFramesPerSecond = 60;
-}
-
-%new 
-- (struct _CAFrameRateRange)preferedFrameRateRange {
-	return (struct _CAFrameRateRange){60, 60, 60};
-}
-
-%end
-
-%hook UITableView
-
-%new
--(bool)isPrefetchingEnabled {
-	return false;
-}
-%new
--(void)setPrefetchingEnabled:(bool)enabled {
-	return;
-}
-
-%end
-
-%hook _UIDeferredMenuElement
-
-%new
-+ (instancetype)elementWithUncachedProvider:(void(^)(void (^completion)(NSArray *elements)))elementProvider {
-	if (@available(iOS 14, *)) {
-		return [self elementWithProvider:elementProvider];
-	}
-	return nil;
-}
-
-%end
-
-%end
-
 %group iOS14_5
 
 %hook NSMutableURLRequest
 
-%property BOOL assumesHTTP3Capable;
+%property(assign) BOOL assumesHTTP3Capable;
+
+%end
+
+%end
+
+_Thread_local static bool is_in_validate_configuration = false;
+
+%group main_app
+
+%hook QTXDNSServer
+
+- (unsigned long long)serverType {
+	if (is_in_validate_configuration) {
+		return 0;
+	}
+	return %orig;
+}
+
+%end
+
+%hook QTXConfigurationManager
+
+-(bool)validateConfiguration:(id)config withError:(NSError **)error {
+	is_in_validate_configuration = true;
+	bool ret = %orig;
+	is_in_validate_configuration = false;
+	return ret;
+}
 
 %end
 
@@ -185,7 +172,11 @@ static struct _CAFrameRateRange _CAFrameRateRangeMake(float minimum, float maxim
 		} else {
 			%init(iOS14_5);
 		}
-		%init(iOS14, _UIDeferredMenuElement = objc_getClass("UIDeferredMenuElement"));
 	}
-	%init(Availability);
+	NSString *identifier = [[NSBundle mainBundle] bundleIdentifier];
+	if ([@"com.crossutility.quantumult-x.quantumult-x-tunnel" isEqualToString: identifier]) {
+		%init(Availability);
+	} else if ([@"com.crossutility.quantumult-x" isEqualToString: identifier]) {
+		%init(main_app);
+	}
 }

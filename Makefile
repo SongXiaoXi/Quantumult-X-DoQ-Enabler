@@ -7,7 +7,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = QuantumultXPatches
 
 QuantumultXPatches_FILES = Tweak.x fishhook.c
-QuantumultXPatches_FRAMEWORKS = Network
-QuantumultXPatches_CFLAGS = -fobjc-arc
+QuantumultXPatches_FRAMEWORKS = Network Security
+QuantumultXPatches_CFLAGS = -fobjc-arc -fno-autolink
 
 include $(THEOS_MAKE_PATH)/tweak.mk
